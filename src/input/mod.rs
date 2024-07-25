@@ -435,6 +435,7 @@ impl State {
                                     }
 
                                     // handle the rest of the global shortcuts
+                                    let mut intercepted = false;
                                     let mut can_clear_modifiers_shortcut = true;
                                     if !shortcuts_inhibited {
                                         let modifiers_queue = seat.modifiers_shortcut_queue();
@@ -454,6 +455,7 @@ impl State {
                                             if !modifiers_bypass && binding.key.is_none() && state == KeyState::Pressed && cosmic_modifiers_eq_smithay(&binding.modifiers, modifiers) {
                                                 modifiers_queue.set(binding.clone());
                                                 can_clear_modifiers_shortcut = false;
+                                                intercepted = true;
                                             }
 
                                             if (
@@ -464,7 +466,10 @@ impl State {
                                                 ) || modifiers_bypass
                                             {
                                                 modifiers_queue.clear();
-                                                seat.supressed_keys().add(&handle, None);
+                                                // only suppress if the action is on Press
+                                                if !modifiers_bypass {
+                                                    seat.supressed_keys().add(&handle, None);
+                                                }
                                                 return FilterResult::Intercept(Some((
                                                     Action::Shortcut(action.clone()),
                                                     binding.clone(),
@@ -479,7 +484,11 @@ impl State {
 
                                     // keys are passed through to apps
                                     std::mem::drop(shell);
-                                    FilterResult::Forward
+                                    if intercepted {
+                                        FilterResult::Intercept(None)
+                                    } else {
+                                        FilterResult::Forward
+                                    }
                                 },
                             )
                             .flatten()
